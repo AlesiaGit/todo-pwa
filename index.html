@@ -1,0 +1,342 @@
+<html>
+<head>
+
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon.png" type="image/png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+	input {
+    	outline: none;
+		border: 0;
+		background-color: #F5F5F5;		
+	}
+
+	input:focus {
+    	outline: none;
+		background-color: lemonchiffon;
+	}
+
+	.text-box {
+		width: 90%;
+	}
+</style>
+
+</head>
+
+<body>
+
+<p>TODO List:</p>
+<div class="container"></div>
+
+<template id="rowTemplate">
+	<div class="todo-item">
+		<input class="check-box" type="checkbox" onclick="cbClicked(event)"/>
+		<input class="text-box" type="text" onkeydown="keydown(event)" onblur="txtBlured(event)" oninput="textChanged()"/>
+	</div>
+</template>
+
+<script>
+
+	state = {};
+	
+	function cbClicked(e)
+	{
+		var items = getItems();
+		var index = items.map(p => p.children[0]).indexOf(e.target);
+		var textBox = items[index].children[1];
+	
+		if (textBox.value == "") {
+			e.preventDefault();
+			return;
+		}
+	
+		sortItems('asc');
+		restoreFocus();
+	
+		save();
+	}
+	
+	function textChanged(e) {
+		//console.log('Text changed');
+		save();
+	}
+	
+	function txtBlured(e) {
+		state.input = e.target;
+		state.pos = e.target.selectionStart;
+	}
+	
+	function keydown(e)
+	{
+		var textBox = e.target;
+		switch (e.key)
+		{
+			case "Enter":
+				handleEnter(textBox);
+				e.preventDefault();
+				break;
+			case "ArrowUp":
+				handleUp(textBox);
+				e.preventDefault();
+				break;
+			case "ArrowDown":
+				handleDown(textBox);
+				e.preventDefault();
+				break;
+			case "Backspace":
+				handleBackspace(textBox, e);
+				break;
+			case "Delete":
+				handleDelete(textBox, e);
+				break;
+		}
+	}
+	
+	// Key handlers
+	
+	function handleBackspace(textBox, e) {
+		//console.log("<Backspace> pressed");
+	
+		if (textBox.value.length != 0) return;
+	
+		var items = getItems();
+		var index = getIndex(textBox);
+	
+		if (items.length == 1) return;
+	
+		if (index != 0) {
+			focusPrevious(index);
+		} else {
+			focusNext(index);
+		}
+		getContainer().removeChild(items[index]);
+	
+		e.preventDefault();
+	}
+	
+	function handleDelete(textBox, e) {
+		//console.log("<Delete> pressed");
+	
+		if (textBox.value.length != 0) return;
+	
+		var items = getItems();
+		var index = getIndex(textBox);
+	
+		if (items.length == 1) return;
+		if (index == items.length - 1) return;
+	
+		focusNext(index);
+	
+		getContainer().removeChild(items[index]);
+	
+		e.preventDefault();
+	}
+	
+	function handleEnter(textBox) {
+		//console.log("<Enter> pressed");
+		
+		if (textBox.value.length == 0) return;
+		
+		var textBoxes = getTextBoxes();
+		var index = textBoxes.indexOf(textBox);
+		
+		if (index != textBoxes.length - 1) return;
+		
+		appendNew();
+		focusLast();
+	}
+	
+	function handleUp(textBox) {
+		//console.log("<Up> pressed");
+		
+		var index = getIndex(textBox);
+		
+		if (index == 0) return;
+		
+		focusPrevious(index, 'maintainPosition');
+	}
+	
+	function handleDown(textBox) {
+		//console.log("<Down> pressed");
+		
+		var textBoxes = getTextBoxes();
+		var index = textBoxes.indexOf(textBox);
+		
+		if (index >= textBoxes.length - 1) return;
+	
+		focusNext(index, 'maintainPosition');
+	}
+	
+	// ------------------------------------------------------
+	// Aux methods
+	// ------------------------------------------------------
+	
+	// Sort
+	
+	function sortItems(direction) {
+		var container = document.querySelector('.container');
+		
+		var items = getItems();
+	
+		items.sort(twoLevelsComparer);
+	
+		for (var i = 0; i < items.length; i++) {
+			container.removeChild(items[i]);
+			container.appendChild(items[i]);
+		}
+	}
+	
+	// Comparers
+	
+	function twoLevelsComparer(a, b) {
+		var av = a.children[1].value;
+		var bv = b.children[1].value;
+	
+		if (av == "") return 1;
+	
+		var ac = a.children[0].checked;
+		var bc = b.children[0].checked;
+		
+		if (ac === bc) {
+			return av > bv ? 1 : av < bv ? -1 : 0;
+		} else {
+			return ac ? -1 : 1;
+		}
+	}
+	
+	// Get
+	
+	function getContainer() {
+		return document.querySelector('.container');
+	}
+	
+	function getItems() {
+		return [...document.querySelectorAll(".todo-item")];
+	}
+	
+	function getTextBoxes() {
+		return [...document.querySelectorAll(".text-box")];
+	}
+	
+	function getIndex(textBox) {
+		var textBoxes = getTextBoxes();
+		return textBoxes.indexOf(textBox);
+	}
+	
+	function getLastItem() {
+		return getItems().pop();
+	}
+	
+	// Create
+	
+	function appendNew() {
+		var template = document.querySelector('#rowTemplate');
+		var clone = template.content.cloneNode(true);
+		
+		var container = document.querySelector('.container');
+		container.appendChild(clone);
+	}
+	
+	// Focus
+	
+	function focusPrevious(index, maintainPosition) {
+		if (index == 0) return;
+	
+		var textBoxes = getTextBoxes();
+		focus(textBoxes[index - 1], textBoxes[index].selectionStart, maintainPosition ? 'oldPos' : 'end');
+	}
+	
+	function focusNext(index, maintainPosition) {
+		var textBoxes = getTextBoxes();
+		if (index < textBoxes.length - 1) {
+			focus(textBoxes[index + 1], textBoxes[index].selectionStart, maintainPosition ? 'oldPos' : 'start');
+		}
+	}
+	
+	function focusLast() {
+		getLastItem().children[1].focus();
+	}
+	
+	function restoreFocus() {
+		if (state.input) {
+			focus(state.input, state.pos, "oldPos");
+		}
+	}
+	
+	function focus(textBox, oldPos, focusOn /* 'oldPos', 'start', 'end' */) {
+		var newPos = calculatePos(oldPos, textBox.value.length, focusOn);
+	
+		var focusHandler = () => setTimeout(() => {
+			textBox.setSelectionRange(newPos, newPos);
+			textBox.removeEventListener("focus", focusHandler);
+		}, 0);
+	
+		textBox.addEventListener("focus", focusHandler);
+		textBox.focus();
+	}
+	
+	function calculatePos(oldPos, length, focusOn) {
+		switch (focusOn) {
+			case 'start': return 0;
+			case 'end': return length;
+			case 'oldPos' : return oldPos;
+		}
+	}
+	
+	// Persist
+	
+	function load() {
+		var data = JSON.parse(window.localStorage.getItem("data") || "[]");
+	
+		var container = getContainer();
+		var items = getItems();
+		for	(var i = 0; i < items.length; i++) {
+			container.removeChild(items[i]);
+		}
+		
+		if (data.length == 0) {
+			appendNew();
+			return;
+		}
+	
+		for	(var i = 0; i < data.length; i++) {
+			appendNew();
+			var last = getLastItem();
+			last.children[0].checked = data[i].checked;
+			last.children[1].value = data[i].text;
+		}
+	}
+	
+	function save() {
+		var data = getItems()
+			.map(item => ({
+				checked: item.children[0].checked,
+				text: item.children[1].value
+			}));
+	
+		//console.log("Saving");
+		
+		window.localStorage.setItem("data", JSON.stringify(data));
+	}
+	
+	function InitApp() {
+		console.log('Loading...');
+		if (navigator.serviceWorker != null) {
+		  navigator.serviceWorker.register('sw.js')
+		  .then(function(registration) {
+			console.log('Registered events at scope: ', registration.scope);
+		  });
+		}
+		load();
+		console.log('Loaded');
+	}
+	
+	// OnLoad
+
+	(() => InitApp())()
+
+</script>
+
+</body>
+</html>
