@@ -2,7 +2,7 @@
   "name": "AD ToDo list",
   "short_name": "AD ToDo list",
   "display": "standalone",
-  "start_url": "/",
+  "start_url": "https://alesiagit.github.io/todo-pwa/index.html",
   "theme_color": "#FFFFFF",
   "background_color": "#FFFFFF",
   "icons": [
